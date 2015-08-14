@@ -16,6 +16,7 @@ import com.nightscout.android.MainActivity;
 import com.nightscout.android.dexcom.records.CalRecord;
 import com.nightscout.android.dexcom.records.GlucoseDataSet;
 import com.nightscout.android.dexcom.records.MeterRecord;
+import com.nightscout.tidepool.Client;
 
 import org.apache.http.Header;
 import org.apache.http.client.ResponseHandler;
@@ -29,17 +30,30 @@ import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.params.HttpParams;
 import org.json.JSONObject;
 
+import java.io.IOException;
 import java.security.MessageDigest;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.TimeZone;
 
 public class Uploader {
     private static final String TAG = Uploader.class.getSimpleName();
+    private static final SimpleDateFormat UTC = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.000'Z'");
+
+    static {
+        UTC.setTimeZone(TimeZone.getTimeZone("UTC"));
+    }
+
     private static final int SOCKET_TIMEOUT = 60000;
     private static final int CONNECTION_TIMEOUT = 30000;
     private Context mContext;
-    private Boolean enableRESTUpload;
-    private Boolean enableMongoUpload;
+    private final boolean enableRESTUpload;
+    private final boolean enableMongoUpload;
+    private final boolean enableTidepoolUpload;
     private SharedPreferences prefs;
 
     public Uploader(Context context) {
@@ -47,6 +61,7 @@ public class Uploader {
         prefs = PreferenceManager.getDefaultSharedPreferences(mContext);
         enableRESTUpload = prefs.getBoolean("cloud_storage_api_enable", false);
         enableMongoUpload = prefs.getBoolean("cloud_storage_mongodb_enable", false);
+        enableTidepoolUpload = prefs.getBoolean("cloud_storage_tidepool_enable", false);
     }
 
     public boolean upload(GlucoseDataSet glucoseDataSet, MeterRecord meterRecord, CalRecord calRecord) {
@@ -63,7 +78,9 @@ public class Uploader {
 
         boolean mongoStatus = false;
         boolean apiStatus = false;
+        boolean tidepoolStatus = false;
 
+        Log.i(TAG, String.format("Do REST upload? %s", enableRESTUpload));
         if (enableRESTUpload) {
             long start = System.currentTimeMillis();
             Log.i(TAG, String.format("Starting upload of %s record using a REST API", glucoseDataSets.length));
@@ -71,6 +88,7 @@ public class Uploader {
             Log.i(TAG, String.format("Finished upload of %s record using a REST API in %s ms", glucoseDataSets.length, System.currentTimeMillis() - start));
         }
 
+        Log.i(TAG, String.format("Do Mongo upload? %s", enableMongoUpload));
         if (enableMongoUpload) {
             long start = System.currentTimeMillis();
             Log.i(TAG, String.format("Starting upload of %s record using a Mongo", glucoseDataSets.length));
@@ -78,10 +96,60 @@ public class Uploader {
             Log.i(TAG, String.format("Finished upload of %s record using a Mongo in %s ms", glucoseDataSets.length + meterRecords.length, System.currentTimeMillis() - start));
         }
 
-        return apiStatus || mongoStatus;
+        Log.i(TAG, String.format("Do Tidepool upload? %s", enableTidepoolUpload));
+        if (enableTidepoolUpload) {
+            long start = System.currentTimeMillis();
+            Log.i(TAG, String.format("Starting upload of %s record using Tidepool", glucoseDataSets.length));
+            tidepoolStatus = doTidepoolUpload(prefs, glucoseDataSets, meterRecords, calRecords);
+            Log.i(TAG, String.format("Finished upload of %s record using Tidepool in %s ms", glucoseDataSets.length + meterRecords.length, System.currentTimeMillis() - start));
+        }
+
+        return apiStatus || mongoStatus || tidepoolStatus;
     }
 
-    private boolean doRESTUpload(SharedPreferences prefs, GlucoseDataSet[] glucoseDataSets, MeterRecord[] meterRecords, CalRecord[] calRecords) {
+  private boolean doTidepoolUpload(SharedPreferences prefs, GlucoseDataSet[] glucoseDataSets, MeterRecord[] meterRecords, CalRecord[] calRecords)
+  {
+    Client client = new Client(
+            prefs.getString("cloud_storage_tidepool_uri", "api.tidepool.io"),
+            prefs.getString("cloud_storage_tidepool_upload", "uploads.tidepool.io")
+    );
+
+      try {
+          String token = client.login(
+                  prefs.getString("cloud_storage_tidepool_username", ""),
+                  prefs.getString("cloud_storage_tidepool_password", "")
+          );
+
+          if (token == null) {
+              Log.e(TAG, "Unable to get token for upload to tidepool.");
+              return false;
+          }
+
+          for (GlucoseDataSet record : glucoseDataSets) {
+              Map<String, Object> event = new LinkedHashMap<>();
+              event.put("type", "cbg");
+              event.put("value", record.getBGValue());
+              event.put("units", "mg/dL");
+              event.put("time", UTC.format(record.getDisplayTime()));
+              event.put("timezoneOffset", 0);
+              event.put("deviceTime", record.getDisplayTime().toGMTString());
+              event.put("deviceId", "dexcom");
+              event.put("source", "nightscout");
+              event.put("uploadId", "nightscout");
+
+              client.postDatum(token, event);
+          }
+      } finally {
+          try {
+              client.close();
+          } catch (IOException e) {
+
+          }
+      }
+      return true;
+  }
+
+  private boolean doRESTUpload(SharedPreferences prefs, GlucoseDataSet[] glucoseDataSets, MeterRecord[] meterRecords, CalRecord[] calRecords) {
         String baseURLSettings = prefs.getString("cloud_storage_api_base", "");
         ArrayList<String> baseURIs = new ArrayList<String>();
 

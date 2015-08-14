@@ -15,10 +15,10 @@ public class GenericTimestampRecord {
     protected Date displayTime;
 
     public GenericTimestampRecord(byte[] packet) {
-        systemTimeSeconds = ByteBuffer.wrap(packet).order(ByteOrder.LITTLE_ENDIAN).getInt(OFFSET_SYS_TIME);
+        ByteBuffer wrapped = ByteBuffer.wrap(packet).order(ByteOrder.LITTLE_ENDIAN);
+        systemTimeSeconds = wrapped.getInt(OFFSET_SYS_TIME);
         systemTime = Utils.receiverTimeToDate(systemTimeSeconds);
-        int dt = ByteBuffer.wrap(packet).order(ByteOrder.LITTLE_ENDIAN).getInt(OFFSET_DISPLAY_TIME);
-        displayTime = Utils.receiverTimeToDate(dt);
+        displayTime = Utils.receiverTimeToDate(wrapped.getInt(OFFSET_DISPLAY_TIME));
     }
 
     public GenericTimestampRecord(Date displayTime, Date systemTime){

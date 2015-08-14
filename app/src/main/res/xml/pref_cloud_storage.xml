@@ -70,6 +70,59 @@
 
     <PreferenceScreen
         android:dependency="i_understand"
+        android:key="cloud_storage_tidepool"
+        android:title="@string/pref_title_tidepool"
+        android:summary="@string/pref_summary_tidepool_enabled">
+
+        <SwitchPreference
+            android:dependency="i_understand"
+            android:title="@string/pref_title_tidepool_enabled"
+            android:key="cloud_storage_tidepool_enable"
+            android:disableDependentsState="false"
+            android:summary="@string/pref_summary_tidepool_enabled">
+        </SwitchPreference>
+
+        <EditTextPreference
+            android:dependency="cloud_storage_tidepool_enable"
+            android:title="@string/pref_title_tidepool_username"
+            android:key="cloud_storage_tidepool_username"
+            android:dialogTitle="@string/pref_dialog_tidepool_username"
+            android:dialogMessage="@string/pref_message_tidepool_username"
+            android:defaultValue="@string/pref_default_tidepool_username">
+        </EditTextPreference>
+
+        <EditTextPreference
+            android:dependency="cloud_storage_tidepool_enable"
+            android:title="@string/pref_title_tidepool_password"
+            android:key="cloud_storage_tidepool_password"
+            android:dialogTitle="@string/pref_dialog_tidepool_password"
+            android:dialogMessage="@string/pref_message_tidepool_password"
+            android:defaultValue="@string/pref_default_tidepool_password">
+        </EditTextPreference>
+
+        <EditTextPreference
+            android:dependency="cloud_storage_tidepool_enable"
+            android:title="@string/pref_title_tidepool_uri"
+            android:key="cloud_storage_tidepool_uri"
+            android:dialogTitle="@string/pref_dialog_tidepool_uri"
+            android:dialogMessage="@string/pref_message_tidepool_uri"
+            android:defaultValue="@string/pref_default_tidepool_uri">
+        </EditTextPreference>
+
+        <EditTextPreference
+            android:dependency="cloud_storage_tidepool_enable"
+            android:title="@string/pref_title_tidepool_upload"
+            android:key="cloud_storage_tidepool_upload"
+            android:dialogTitle="@string/pref_dialog_tidepool_upload"
+            android:dialogMessage="@string/pref_message_tidepool_upload"
+            android:defaultValue="@string/pref_default_tidepool_upload">
+        </EditTextPreference>
+
+    </PreferenceScreen>
+
+
+    <PreferenceScreen
+        android:dependency="i_understand"
         android:key="cloud_data_to_upload"
         android:title="@string/pref_title_data_to_upload"
         android:summary="@string/pref_summary_data_to_upload">
